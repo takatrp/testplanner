@@ -24,7 +24,7 @@
         body {
             font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
             -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
+            touch-action: pan-y; /* Allow vertical scroll generally */
             overscroll-behavior-y: none;
             user-select: none;
             -webkit-user-select: none;
@@ -93,23 +93,32 @@
                 dragImageTranslateOverride: (event, element, initialX, initialY, currentX, currentY) => {
                     return {
                         x: currentX - (element.offsetWidth / 2),
-                        y: currentY - (element.offsetHeight / 2) - 50 
+                        y: currentY - (element.offsetHeight / 2) - 60 
                     };
                 },
+                // Reduced hold time significantly for better responsiveness
+                holdToDrag: 50, 
                 iterationIntervalMs: 50,
-                holdToDrag: 200, // 200ms hold time
-                onDragEnter: function(event) {}
             });
         }
 
-        // iOS Scroll Fix: Aggressively prevent default scrolling when touching handles
+        // --- POWERFUL SCROLL PREVENTION FOR IOS ---
+        
+        // 1. Prevent default on touchstart for handles
+        // This stops iOS from initiating a scroll gesture immediately
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.closest('.drag-handle')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // 2. Prevent scroll during drag or on handles
         document.addEventListener('touchmove', function(e) {
-            // Check if we are dragging (polyfill image exists) OR touching a handle
             const isDragging = document.querySelector('.dnd-poly-drag-image');
             const isTouchingHandle = e.target.closest('.drag-handle');
 
             if (isDragging || isTouchingHandle) {
-                e.preventDefault(); // Stop scrolling!
+                e.preventDefault();
             }
         }, { passive: false });
     </script>
@@ -598,7 +607,7 @@
                                         className="text-xl font-bold text-gray-900 bg-transparent border-none p-0 focus:ring-0 w-full placeholder-gray-300"
                                         placeholder="テスト名を入力"
                                     />
-                                    <p className="text-xs text-gray-500">カード右上のつまみ(⋮⋮)を長押しして移動</p>
+                                    <p className="text-xs text-gray-500">カード右上のつまみ(⋮⋮)をタッチして移動</p>
                                 </div>
                             </div>
 
@@ -634,7 +643,7 @@
                                             <TrendingUp size={20} className="text-green-500"/>
                                             定着度
                                         </h2>
-                                        <p className="text-sm text-slate-400 mt-1">iPad対応: 各項目の「⋮⋮」を長押し→ドラッグで移動できます</p>
+                                        <p className="text-sm text-slate-400 mt-1">iPad対応: 各項目の「⋮⋮」をドラッグして移動できます</p>
                                     </div>
                                     <span className="text-4xl font-bold text-slate-800">{totalProgress}%</span>
                                 </div>
@@ -708,8 +717,6 @@
                                                  {/* DRAG HANDLE */}
                                                 <div 
                                                     className="text-slate-300 p-3 -m-1 drag-handle cursor-grab active:cursor-grabbing hover:bg-slate-100 rounded mr-1"
-                                                    style={{touchAction: 'none'}}
-                                                    onTouchStart={() => {}} // iOS Hack to ensure active state and prevent scroll
                                                 >
                                                     <GripVertical size={22} />
                                                 </div>
@@ -751,8 +758,6 @@
                                                         {/* HANDLE FOR DRAGGING TASK */}
                                                         <div 
                                                             className="flex items-center gap-2 text-slate-300 p-3 -m-2 drag-handle cursor-grab active:cursor-grabbing"
-                                                            style={{touchAction: 'none'}}
-                                                            onTouchStart={() => {}} // iOS Hack
                                                         >
                                                             <GripVertical size={18} />
                                                         </div>
