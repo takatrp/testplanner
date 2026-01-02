@@ -25,8 +25,8 @@
             font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
-            overscroll-behavior-y: none; /* Prevent pull-to-refresh affecting drag */
-            user-select: none; /* Global selection prevention for app-like feel */
+            overscroll-behavior-y: none;
+            user-select: none;
             -webkit-user-select: none;
         }
         .custom-scrollbar::-webkit-scrollbar {
@@ -45,43 +45,39 @@
         
         /* --- Drag and Drop Visuals --- */
         
-        /* The item left behind */
+        /* The original item while dragging */
         .draggable-source {
             opacity: 0.3;
             filter: grayscale(100%);
         }
 
-        /* The drop target */
+        /* The drop target feedback */
         .draggable-over {
-            border: 2px dashed #6366f1 !important; /* Indigo-500 */
-            background-color: #eef2ff !important; /* Indigo-50 */
+            border: 2px dashed #6366f1 !important;
+            background-color: #eef2ff !important;
             transform: scale(0.98);
             transition: all 0.2s;
         }
         
-        /* The floating item (Polyfill generated) */
+        /* The floating ghost image (Polyfill generated) */
         .dnd-poly-drag-image {
-            opacity: 1 !important;
+            opacity: 0.95 !important;
             transform: scale(1.05) !important;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
-            border-radius: 0.75rem !important; /* rounded-xl */
-            background-color: white !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+            border-radius: 0.75rem !important;
+            background-color: #fffbeb !important; /* Slightly yellow tint for "lifted" feel */
             z-index: 9999 !important;
+            border: 2px solid #6366f1 !important;
         }
 
-        /* Handle styling */
+        /* Critical style for touch devices */
         .drag-handle {
-            touch-action: none; 
+            touch-action: none !important; /* Force disable scroll on handle */
             cursor: grab;
+            -webkit-touch-callout: none;
         }
         .drag-handle:active {
             cursor: grabbing;
-        }
-        
-        /* Prevent text selection while dragging */
-        .no-select {
-            user-select: none;
-            -webkit-user-select: none;
         }
     </style>
 </head>
@@ -89,42 +85,33 @@
     <div id="root"></div>
 
     <script>
-        // Initialize Mobile Drag Drop Polyfill with enhanced settings
+        // Initialize Mobile Drag Drop Polyfill
         if (window.MobileDragDrop) {
             MobileDragDrop.polyfill({
-                // Center the drag image on touch to make it visible under finger
                 dragImageCenterOnTouch: true,
-                // Offset the image slightly up so the user can see what they are dragging
+                // Lift the image up so finger doesn't hide it
                 dragImageTranslateOverride: (event, element, initialX, initialY, currentX, currentY) => {
                     return {
                         x: currentX - (element.offsetWidth / 2),
-                        y: currentY - (element.offsetHeight / 2) - 30 // Lift up by 30px
+                        y: currentY - (element.offsetHeight / 2) - 50 
                     };
                 },
                 iterationIntervalMs: 50,
-                holdToDrag: 150, // Faster response (150ms)
-                onDragEnter: function(event) {
-                    // optional feedback logic
-                }
+                holdToDrag: 200, // 200ms hold time
+                onDragEnter: function(event) {}
             });
         }
 
-        // Prevent default touch actions on drag handles to avoid scrolling
-        // This is a more aggressive approach to ensure dragging works on iPad
-        document.addEventListener('touchstart', function(e) {
-            if (e.target.closest('.drag-handle')) {
-                // If touching a handle, we might want to prevent default if logic requires,
-                // but usually touch-action: none handles it. 
-                // However, preventing scroll on move is critical.
-            }
-        }, {passive: false});
-
+        // iOS Scroll Fix: Aggressively prevent default scrolling when touching handles
         document.addEventListener('touchmove', function(e) {
-            // If the user is dragging something (polyfill active) or touching a handle, prevent scroll
-            if (document.querySelector('.dnd-poly-drag-image') || e.target.closest('.drag-handle')) {
-                e.preventDefault();
+            // Check if we are dragging (polyfill image exists) OR touching a handle
+            const isDragging = document.querySelector('.dnd-poly-drag-image');
+            const isTouchingHandle = e.target.closest('.drag-handle');
+
+            if (isDragging || isTouchingHandle) {
+                e.preventDefault(); // Stop scrolling!
             }
-        }, {passive: false});
+        }, { passive: false });
     </script>
 
     <script type="text/babel">
@@ -719,7 +706,11 @@
                                             
                                             <div className="flex items-center gap-1">
                                                  {/* DRAG HANDLE */}
-                                                <div className="text-slate-300 p-2 drag-handle cursor-grab active:cursor-grabbing hover:bg-slate-100 rounded mr-1">
+                                                <div 
+                                                    className="text-slate-300 p-3 -m-1 drag-handle cursor-grab active:cursor-grabbing hover:bg-slate-100 rounded mr-1"
+                                                    style={{touchAction: 'none'}}
+                                                    onTouchStart={() => {}} // iOS Hack to ensure active state and prevent scroll
+                                                >
                                                     <GripVertical size={22} />
                                                 </div>
 
@@ -758,7 +749,11 @@
                                                         onDrop={(e) => handleDrop(e, task.id, subject.id)}
                                                     >
                                                         {/* HANDLE FOR DRAGGING TASK */}
-                                                        <div className="flex items-center gap-2 text-slate-300 p-2 drag-handle cursor-grab active:cursor-grabbing">
+                                                        <div 
+                                                            className="flex items-center gap-2 text-slate-300 p-3 -m-2 drag-handle cursor-grab active:cursor-grabbing"
+                                                            style={{touchAction: 'none'}}
+                                                            onTouchStart={() => {}} // iOS Hack
+                                                        >
                                                             <GripVertical size={18} />
                                                         </div>
 
