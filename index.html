@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>定期テスト完全攻略プランナー</title>
     
     <!-- React & ReactDOM -->
@@ -15,10 +15,17 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <!-- Mobile Drag and Drop Polyfill -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.css">
+    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/index.min.js"></script>
+    <!-- Note: scroll-behaviour is optional and was causing issues, removed dependency in logic -->
+
     <!-- Custom Styles -->
     <style>
         body {
             font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+            touch-action: manipulation; /* Improve touch response */
         }
         .custom-scrollbar::-webkit-scrollbar {
             width: 4px;
@@ -33,10 +40,45 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #94a3b8; 
         }
+        
+        /* Drag and Drop Styles */
+        .draggable-source {
+            opacity: 0.4;
+        }
+        .draggable-over {
+            border: 2px dashed #6366f1; /* Indigo-500 */
+            background-color: #eef2ff; /* Indigo-50 */
+        }
+        
+        /* Prevent text selection while dragging */
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
     <div id="root"></div>
+
+    <script>
+        // Initialize Mobile Drag Drop Polyfill
+        // Added safety check to ensure MobileDragDrop is loaded
+        if (window.MobileDragDrop) {
+            MobileDragDrop.polyfill({
+                // use this to make use of the scroll behaviour
+                dragImageCenterOnTouch: true,
+                iterationIntervalMs: 50,
+                holdToDrag: 300, // Long press duration in ms
+                onDragEnter: function(event) {
+                    // optional feedback logic
+                }
+            });
+        }
+        
+        // Fix for iOS scrolling while dragging
+        // This allows preventDefault() to work in touch events
+        document.addEventListener('touchmove', function(e) {}, {passive: false});
+    </script>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
@@ -83,7 +125,7 @@
         const Trash2 = (props) => (
             <IconWrapper {...props}>
                 <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path>
                 <line x1="10" y1="11" x2="10" y2="17"></line>
                 <line x1="14" y1="11" x2="14" y2="17"></line>
             </IconWrapper>
@@ -126,10 +168,21 @@
             </IconWrapper>
         );
 
+        const GripVertical = (props) => (
+            <IconWrapper {...props}>
+                <circle cx="9" cy="12" r="1"></circle>
+                <circle cx="9" cy="5" r="1"></circle>
+                <circle cx="9" cy="19" r="1"></circle>
+                <circle cx="15" cy="12" r="1"></circle>
+                <circle cx="15" cy="5" r="1"></circle>
+                <circle cx="15" cy="19" r="1"></circle>
+            </IconWrapper>
+        );
+
         // --- Components ---
 
-        const ProgressBar = ({ current, max, colorClass }) => {
-            const percentage = max > 0 ? Math.min(100, (current / max) * 100) : 0;
+        const ProgressBar = ({ currentScore, maxScore, colorClass }) => {
+            const percentage = maxScore > 0 ? Math.min(100, (currentScore / maxScore) * 100) : 0;
             return (
                 <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
                     <div 
@@ -230,7 +283,7 @@
                     <div className="flex gap-2 w-full">
                         <button 
                             onClick={toggleTimer}
-                            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors ${
                                 isActive 
                                 ? 'bg-red-100 text-red-600 hover:bg-red-200' 
                                 : 'bg-indigo-600 text-white hover:bg-indigo-700'
@@ -240,9 +293,9 @@
                         </button>
                         <button 
                             onClick={resetTimer}
-                            className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+                            className="p-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
                         >
-                            <RefreshCw size={20} />
+                            <RefreshCw size={24} />
                         </button>
                     </div>
                 </div>
@@ -255,10 +308,16 @@
             const [subjects, setSubjects] = useState(() => {
                 const saved = localStorage.getItem('studySubjects');
                 return saved ? JSON.parse(saved) : [
-                    { id: 1, name: '数学 (代数)', target: 85, tasks: [] },
-                    { id: 2, name: '数学 (幾何)', target: 80, tasks: [] },
-                    { id: 3, name: '英語 (Grammar)', target: 90, tasks: [] },
+                    { id: 1, name: '国語', target: 80, tasks: [] },
+                    { id: 2, name: '数学', target: 80, tasks: [] },
+                    { id: 3, name: '英語', target: 80, tasks: [] },
+                    { id: 4, name: '理科', target: 80, tasks: [] },
+                    { id: 5, name: '社会', target: 80, tasks: [] },
                 ];
+            });
+
+            const [testName, setTestName] = useState(() => {
+                return localStorage.getItem('studyTestName') || '定期テスト完全攻略';
             });
 
             const [examDate, setExamDate] = useState(() => {
@@ -270,30 +329,64 @@
             const [newTaskName, setNewTaskName] = useState('');
             const [newTaskRange, setNewTaskRange] = useState('');
 
+            // Subject Modal States (Add/Edit)
             const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+            const [editingSubjectId, setEditingSubjectId] = useState(null); // null means adding mode
             const [newSubjectName, setNewSubjectName] = useState('');
             const [newSubjectTarget, setNewSubjectTarget] = useState(80);
+
+            // Drag and Drop State
+            const [draggedItem, setDraggedItem] = useState(null); // { type: 'subject' | 'task', id: number, subjectId?: number }
 
             useEffect(() => {
                 localStorage.setItem('studySubjects', JSON.stringify(subjects));
             }, [subjects]);
 
             useEffect(() => {
+                localStorage.setItem('studyTestName', testName);
+            }, [testName]);
+
+            useEffect(() => {
                 localStorage.setItem('studyExamDate', examDate);
             }, [examDate]);
 
-            const addSubject = () => {
+            // Subject Management
+            const openSubjectModal = (subject = null) => {
+                if (subject) {
+                    setEditingSubjectId(subject.id);
+                    setNewSubjectName(subject.name);
+                    setNewSubjectTarget(subject.target);
+                } else {
+                    setEditingSubjectId(null);
+                    setNewSubjectName('');
+                    setNewSubjectTarget(80);
+                }
+                setIsSubjectModalOpen(true);
+            };
+
+            const saveSubject = () => {
                 if (!newSubjectName.trim()) return;
-                const newSubject = {
-                    id: Date.now(),
-                    name: newSubjectName,
-                    target: parseInt(newSubjectTarget) || 80,
-                    tasks: []
-                };
-                setSubjects([...subjects, newSubject]);
+                
+                if (editingSubjectId) {
+                    setSubjects(subjects.map(s => s.id === editingSubjectId ? {
+                        ...s,
+                        name: newSubjectName,
+                        target: parseInt(newSubjectTarget) || 0
+                    } : s));
+                } else {
+                    const newSubject = {
+                        id: Date.now(),
+                        name: newSubjectName,
+                        target: parseInt(newSubjectTarget) || 80,
+                        tasks: []
+                    };
+                    setSubjects([...subjects, newSubject]);
+                }
+                
+                setIsSubjectModalOpen(false);
                 setNewSubjectName('');
                 setNewSubjectTarget(80);
-                setIsSubjectModalOpen(false);
+                setEditingSubjectId(null);
             };
 
             const deleteSubject = (id) => {
@@ -302,6 +395,7 @@
                 }
             };
 
+            // Task Management
             const openTaskModal = (subjectId) => {
                 setActiveSubjectId(subjectId);
                 setIsModalOpen(true);
@@ -320,7 +414,7 @@
                                     id: Date.now(),
                                     name: newTaskName,
                                     range: newTaskRange,
-                                    level: 0 // 0: Not started, 1: Once, 2: Twice, 3: Perfect
+                                    level: 0
                                 }
                             ]
                         };
@@ -360,6 +454,73 @@
                 }));
             };
 
+            // Drag and Drop Logic
+            const handleDragStart = (e, type, item, subjectId = null) => {
+                setDraggedItem({ type, id: item.id, subjectId });
+                e.dataTransfer.effectAllowed = 'move';
+                // Ghost image fix for mobile polyfill is handled automatically or can be customized
+                // Add a class to the element being dragged
+                e.currentTarget.classList.add('draggable-source');
+            };
+
+            const handleDragEnd = (e) => {
+                e.currentTarget.classList.remove('draggable-source');
+                setDraggedItem(null);
+                
+                // Clear any drag-over styles
+                document.querySelectorAll('.draggable-over').forEach(el => el.classList.remove('draggable-over'));
+            };
+
+            const handleDragOver = (e, type) => {
+                if (!draggedItem || draggedItem.type !== type) return;
+                e.preventDefault(); // Necessary for Drop
+                e.currentTarget.classList.add('draggable-over');
+            };
+
+            const handleDragLeave = (e) => {
+                e.currentTarget.classList.remove('draggable-over');
+            };
+
+            const handleDrop = (e, targetId, targetSubjectId = null) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('draggable-over');
+
+                if (!draggedItem) return;
+
+                // Reorder Subjects
+                if (draggedItem.type === 'subject' && targetSubjectId === null) {
+                    const fromIndex = subjects.findIndex(s => s.id === draggedItem.id);
+                    const toIndex = subjects.findIndex(s => s.id === targetId);
+                    
+                    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+
+                    const newSubjects = [...subjects];
+                    const [moved] = newSubjects.splice(fromIndex, 1);
+                    newSubjects.splice(toIndex, 0, moved);
+                    setSubjects(newSubjects);
+                }
+                
+                // Reorder Tasks (only within same subject for simplicity in this version)
+                if (draggedItem.type === 'task' && draggedItem.subjectId === targetSubjectId) {
+                    const subjectIndex = subjects.findIndex(s => s.id === targetSubjectId);
+                    if (subjectIndex === -1) return;
+
+                    const tasks = [...subjects[subjectIndex].tasks];
+                    const fromIndex = tasks.findIndex(t => t.id === draggedItem.id);
+                    const toIndex = tasks.findIndex(t => t.id === targetId);
+
+                    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+
+                    const [moved] = tasks.splice(fromIndex, 1);
+                    tasks.splice(toIndex, 0, moved);
+
+                    const newSubjects = [...subjects];
+                    newSubjects[subjectIndex] = { ...newSubjects[subjectIndex], tasks };
+                    setSubjects(newSubjects);
+                }
+            };
+
+
             const getTaskStatusColor = (level) => {
                 switch(level) {
                     case 0: return 'bg-gray-100 text-gray-400 border-gray-200';
@@ -381,22 +542,30 @@
             };
 
             const totalTasks = subjects.reduce((acc, sub) => acc + sub.tasks.length, 0);
-            const completedTasks = subjects.reduce((acc, sub) => acc + sub.tasks.filter(t => t.level === 3).length, 0);
-            const totalProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            const totalPossibleScore = totalTasks * 3;
+            const currentTotalScore = subjects.reduce((acc, sub) => 
+                acc + sub.tasks.reduce((tAcc, task) => tAcc + task.level, 0), 0);
+            const totalProgress = totalPossibleScore > 0 ? Math.round((currentTotalScore / totalPossibleScore) * 100) : 0;
 
             return (
-                <div className="min-h-screen bg-slate-50 text-slate-800 pb-20">
+                <div className="min-h-screen bg-slate-50 text-slate-800 pb-20 no-select">
                     
                     {/* Header */}
-                    <header className="bg-white border-b border-indigo-100 sticky top-0 z-10 shadow-sm">
+                    <header className="bg-white border-b border-indigo-100 sticky top-0 z-20 shadow-sm">
                         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-indigo-600 p-2 rounded-lg">
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <div className="bg-indigo-600 p-2 rounded-lg shrink-0">
                                     <BookOpen className="text-white" size={24} />
                                 </div>
-                                <div>
-                                    <h1 className="text-xl font-bold text-gray-900">定期テスト完全攻略</h1>
-                                    <p className="text-xs text-gray-500">私立中高一貫校向け学習マネージャー</p>
+                                <div className="flex-1 min-w-0">
+                                    <input 
+                                        type="text" 
+                                        value={testName}
+                                        onChange={(e) => setTestName(e.target.value)}
+                                        className="text-xl font-bold text-gray-900 bg-transparent border-none p-0 focus:ring-0 w-full placeholder-gray-300"
+                                        placeholder="テスト名を入力"
+                                    />
+                                    <p className="text-xs text-gray-500">長押しで並べ替え / 編集可</p>
                                 </div>
                             </div>
 
@@ -430,9 +599,9 @@
                                     <div>
                                         <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2">
                                             <TrendingUp size={20} className="text-green-500"/>
-                                            全体の進捗率 (完璧レベル)
+                                            定着度
                                         </h2>
-                                        <p className="text-sm text-slate-400 mt-1">「完璧」ステータスのタスク割合</p>
+                                        <p className="text-sm text-slate-400 mt-1">iPad対応: 各項目を長押し→ドラッグで移動できます</p>
                                     </div>
                                     <span className="text-4xl font-bold text-slate-800">{totalProgress}%</span>
                                 </div>
@@ -442,7 +611,7 @@
                                         style={{ width: `${totalProgress}%` }}
                                     ></div>
                                 </div>
-                                <p className="text-right text-xs text-slate-400 mt-2">全タスク数: {totalTasks} / 完了: {completedTasks}</p>
+                                <p className="text-right text-xs text-slate-400 mt-2">全タスク数: {totalTasks}</p>
                             </div>
 
                             {/* Timer Widget */}
@@ -456,10 +625,10 @@
                                 科目別プラン
                             </h2>
                             <button 
-                                onClick={() => setIsSubjectModalOpen(true)}
-                                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm transition-all shadow-md hover:shadow-lg"
+                                onClick={() => openSubjectModal()}
+                                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-3 rounded-lg text-sm transition-all shadow-md active:scale-95"
                             >
-                                <Plus size={16} />
+                                <Plus size={20} />
                                 科目を追加
                             </button>
                         </div>
@@ -467,55 +636,95 @@
                         {/* Subject Cards Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {subjects.map((subject) => {
-                                const subjectTotal = subject.tasks.length;
-                                const subjectDone = subject.tasks.filter(t => t.level === 3).length;
+                                const subjectMaxScore = subject.tasks.length * 3;
+                                const subjectCurrentScore = subject.tasks.reduce((acc, t) => acc + t.level, 0);
+                                const subjectPercentage = subjectMaxScore > 0 ? Math.round((subjectCurrentScore / subjectMaxScore) * 100) : 0;
                                 
                                 return (
-                                    <div key={subject.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                                        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-start">
-                                            <div>
-                                                <h3 className="font-bold text-lg text-slate-800">{subject.name}</h3>
+                                    <div 
+                                        key={subject.id} 
+                                        className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all"
+                                        draggable="true"
+                                        onDragStart={(e) => handleDragStart(e, 'subject', subject)}
+                                        onDragEnd={handleDragEnd}
+                                        onDragOver={(e) => handleDragOver(e, 'subject')}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={(e) => handleDrop(e, subject.id)}
+                                    >
+                                        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-start cursor-move">
+                                            <div className="flex items-center gap-2 text-slate-400 mr-2">
+                                                <GripVertical size={20} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="font-bold text-lg text-slate-800">{subject.name}</h3>
+                                                    <button 
+                                                        onClick={() => openSubjectModal(subject)}
+                                                        className="text-slate-400 hover:text-indigo-600 p-2"
+                                                        title="科目を編集"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
                                                         目標: {subject.target}点
                                                     </span>
                                                 </div>
                                             </div>
-                                            <button 
-                                                onClick={() => deleteSubject(subject.id)}
-                                                className="text-slate-300 hover:text-red-400 transition-colors p-1"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            
+                                            <div className="flex items-center gap-1">
+                                                <button 
+                                                    onClick={() => deleteSubject(subject.id)}
+                                                    className="text-slate-300 hover:text-red-400 p-2"
+                                                    title="科目を削除"
+                                                >
+                                                    <Trash2 size={20} />
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="p-4 flex-1">
                                             <div className="mb-4">
                                                 <div className="flex justify-between text-xs text-slate-500 mb-1">
-                                                    <span>習熟度</span>
-                                                    <span>{subjectTotal > 0 ? Math.round((subjectDone / subjectTotal) * 100) : 0}%</span>
+                                                    <span>定着度</span>
+                                                    <span>{subjectPercentage}%</span>
                                                 </div>
-                                                <ProgressBar current={subjectDone} max={subjectTotal} colorClass="bg-green-500" />
+                                                <ProgressBar currentScore={subjectCurrentScore} maxScore={subjectMaxScore} colorClass="bg-green-500" />
                                             </div>
 
-                                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                                            <div className="space-y-3 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
                                                 {subject.tasks.length === 0 && (
                                                     <p className="text-center text-xs text-slate-400 py-4">タスクがありません。<br/>範囲を追加しましょう。</p>
                                                 )}
-                                                {subject.tasks.map(task => (
-                                                    <div key={task.id} className="group flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
-                                                        <div className="flex-1 min-w-0 mr-2">
-                                                            <p className="text-sm font-medium text-slate-700 truncate">{task.name}</p>
-                                                            {task.range && <p className="text-xs text-slate-400 truncate">{task.range}</p>}
+                                                {subject.tasks.map((task, index) => (
+                                                    <div 
+                                                        key={task.id} 
+                                                        className="flex items-center justify-between p-3 rounded-lg bg-white border border-slate-100 shadow-sm transition-all"
+                                                        draggable="true"
+                                                        onDragStart={(e) => handleDragStart(e, 'task', task, subject.id)}
+                                                        onDragEnd={handleDragEnd}
+                                                        onDragOver={(e) => handleDragOver(e, 'task')}
+                                                        onDragLeave={handleDragLeave}
+                                                        onDrop={(e) => handleDrop(e, task.id, subject.id)}
+                                                    >
+                                                        
+                                                        <div className="flex items-center gap-2 text-slate-300 cursor-move p-1">
+                                                            <GripVertical size={18} />
+                                                        </div>
+
+                                                        <div className="flex-1 min-w-0 mr-2 ml-1">
+                                                            <p className="text-base font-medium text-slate-700 truncate">{task.name}</p>
+                                                            {task.range && <p className="text-xs text-slate-400 truncate mt-0.5">{task.range}</p>}
                                                         </div>
                                                         
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-3">
                                                             <button
                                                                 onClick={() => cycleTaskLevel(subject.id, task.id)}
-                                                                className={`flex flex-col items-center justify-center w-20 py-1 rounded border text-[10px] font-bold transition-all ${getTaskStatusColor(task.level)}`}
+                                                                className={`flex flex-col items-center justify-center w-24 py-2 rounded-lg border text-xs font-bold transition-all ${getTaskStatusColor(task.level)}`}
                                                             >
                                                                 <span>{getTaskStatusLabel(task.level)}</span>
-                                                                <div className="flex gap-0.5 mt-1">
+                                                                <div className="flex gap-1 mt-1">
                                                                     {[1, 2, 3].map(i => (
                                                                         <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= task.level ? 'bg-current' : 'bg-gray-300 opacity-30'}`}></div>
                                                                     ))}
@@ -523,9 +732,9 @@
                                                             </button>
                                                             <button 
                                                                 onClick={() => deleteTask(subject.id, task.id)}
-                                                                className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                className="text-slate-300 hover:text-red-400 p-2"
                                                             >
-                                                                <XIcon size={14} />
+                                                                <XIcon size={18} />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -536,9 +745,9 @@
                                         <div className="p-3 bg-slate-50 border-t border-slate-100">
                                             <button 
                                                 onClick={() => openTaskModal(subject.id)}
-                                                className="w-full py-2 border-2 border-dashed border-slate-300 text-slate-500 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all text-sm font-medium flex items-center justify-center gap-2"
+                                                className="w-full py-3 border-2 border-dashed border-slate-300 text-slate-500 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all text-sm font-medium flex items-center justify-center gap-2 active:scale-98"
                                             >
-                                                <Plus size={16} />
+                                                <Plus size={18} />
                                                 タスク・範囲を追加
                                             </button>
                                         </div>
@@ -549,14 +758,14 @@
 
                         {subjects.length === 0 && (
                             <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
-                                <div className="bg-indigo-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Plus size={32} className="text-indigo-400" />
+                                <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <Plus size={40} className="text-indigo-400" />
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-700 mb-2">まだ科目がありません</h3>
-                                <p className="text-slate-400 mb-6 max-w-sm mx-auto">「科目を追加」ボタンから、今回のテスト教科を登録して学習計画をスタートしましょう。</p>
+                                <h3 className="text-xl font-bold text-slate-700 mb-2">まだ科目がありません</h3>
+                                <p className="text-slate-400 mb-8 max-w-sm mx-auto">「科目を追加」ボタンから、今回のテスト教科を登録して学習計画をスタートしましょう。</p>
                                 <button 
-                                    onClick={() => setIsSubjectModalOpen(true)}
-                                    className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-indigo-200 hover:-translate-y-1 transition-all"
+                                    onClick={() => openSubjectModal()}
+                                    className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold shadow-lg hover:shadow-indigo-200 hover:-translate-y-1 transition-all text-lg"
                                 >
                                     最初の科目を作成
                                 </button>
@@ -580,7 +789,7 @@
                                             value={newTaskName}
                                             onChange={(e) => setNewTaskName(e.target.value)}
                                             placeholder="例: 体系数学 問題集"
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800"
+                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 text-base"
                                             autoFocus
                                         />
                                     </div>
@@ -591,19 +800,19 @@
                                             value={newTaskRange}
                                             onChange={(e) => setNewTaskRange(e.target.value)}
                                             placeholder="例: p.32 ~ p.45"
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800"
+                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 text-base"
                                         />
                                     </div>
                                     <div className="flex gap-3 pt-2">
                                         <button 
                                             onClick={() => setIsModalOpen(false)}
-                                            className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors"
+                                            className="flex-1 py-4 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors"
                                         >
                                             キャンセル
                                         </button>
                                         <button 
                                             onClick={addTask}
-                                            className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 hover:shadow-indigo-200 transition-all"
+                                            className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 hover:shadow-indigo-200 transition-all"
                                         >
                                             追加する
                                         </button>
@@ -619,7 +828,7 @@
                             <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                                     <BookOpen size={18} className="text-indigo-600"/>
-                                    新しい科目を追加
+                                    {editingSubjectId ? '科目を編集' : '新しい科目を追加'}
                                 </h3>
                                 <div className="space-y-4">
                                     <div>
@@ -629,7 +838,7 @@
                                             value={newSubjectName}
                                             onChange={(e) => setNewSubjectName(e.target.value)}
                                             placeholder="例: 物理基礎"
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800"
+                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 text-base"
                                             autoFocus
                                         />
                                     </div>
@@ -639,21 +848,21 @@
                                             type="number" 
                                             value={newSubjectTarget}
                                             onChange={(e) => setNewSubjectTarget(e.target.value)}
-                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 font-mono"
+                                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 font-mono text-base"
                                         />
                                     </div>
                                     <div className="flex gap-3 pt-2">
                                         <button 
                                             onClick={() => setIsSubjectModalOpen(false)}
-                                            className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors"
+                                            className="flex-1 py-4 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors"
                                         >
                                             キャンセル
                                         </button>
                                         <button 
-                                            onClick={addSubject}
-                                            className="flex-1 py-3 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-900 transition-all"
+                                            onClick={saveSubject}
+                                            className="flex-1 py-4 bg-slate-800 text-white font-bold rounded-xl shadow-lg hover:bg-slate-900 transition-all"
                                         >
-                                            作成する
+                                            {editingSubjectId ? '更新する' : '作成する'}
                                         </button>
                                     </div>
                                 </div>
