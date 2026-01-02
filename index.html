@@ -26,6 +26,8 @@
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
             overscroll-behavior-y: none; /* Prevent pull-to-refresh affecting drag */
+            user-select: none; /* Global selection prevention for app-like feel */
+            -webkit-user-select: none;
         }
         .custom-scrollbar::-webkit-scrollbar {
             width: 4px;
@@ -41,17 +43,33 @@
             background: #94a3b8; 
         }
         
-        /* Drag and Drop Styles */
+        /* --- Drag and Drop Visuals --- */
+        
+        /* The item left behind */
         .draggable-source {
-            opacity: 0.4;
+            opacity: 0.3;
+            filter: grayscale(100%);
         }
+
+        /* The drop target */
         .draggable-over {
-            border: 2px dashed #6366f1; /* Indigo-500 */
-            background-color: #eef2ff; /* Indigo-50 */
+            border: 2px dashed #6366f1 !important; /* Indigo-500 */
+            background-color: #eef2ff !important; /* Indigo-50 */
+            transform: scale(0.98);
+            transition: all 0.2s;
         }
         
-        /* CRITICAL FIX FOR IPAD: 
-           Apply this class to the grip handle to prevent scrolling when touching it */
+        /* The floating item (Polyfill generated) */
+        .dnd-poly-drag-image {
+            opacity: 1 !important;
+            transform: scale(1.05) !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
+            border-radius: 0.75rem !important; /* rounded-xl */
+            background-color: white !important;
+            z-index: 9999 !important;
+        }
+
+        /* Handle styling */
         .drag-handle {
             touch-action: none; 
             cursor: grab;
@@ -71,17 +89,42 @@
     <div id="root"></div>
 
     <script>
-        // Initialize Mobile Drag Drop Polyfill
+        // Initialize Mobile Drag Drop Polyfill with enhanced settings
         if (window.MobileDragDrop) {
             MobileDragDrop.polyfill({
+                // Center the drag image on touch to make it visible under finger
                 dragImageCenterOnTouch: true,
+                // Offset the image slightly up so the user can see what they are dragging
+                dragImageTranslateOverride: (event, element, initialX, initialY, currentX, currentY) => {
+                    return {
+                        x: currentX - (element.offsetWidth / 2),
+                        y: currentY - (element.offsetHeight / 2) - 30 // Lift up by 30px
+                    };
+                },
                 iterationIntervalMs: 50,
-                holdToDrag: 200, // Reduced slightly for better responsiveness
+                holdToDrag: 150, // Faster response (150ms)
                 onDragEnter: function(event) {
                     // optional feedback logic
                 }
             });
         }
+
+        // Prevent default touch actions on drag handles to avoid scrolling
+        // This is a more aggressive approach to ensure dragging works on iPad
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.closest('.drag-handle')) {
+                // If touching a handle, we might want to prevent default if logic requires,
+                // but usually touch-action: none handles it. 
+                // However, preventing scroll on move is critical.
+            }
+        }, {passive: false});
+
+        document.addEventListener('touchmove', function(e) {
+            // If the user is dragging something (polyfill active) or touching a handle, prevent scroll
+            if (document.querySelector('.dnd-poly-drag-image') || e.target.closest('.drag-handle')) {
+                e.preventDefault();
+            }
+        }, {passive: false});
     </script>
 
     <script type="text/babel">
@@ -568,7 +611,7 @@
                                         className="text-xl font-bold text-gray-900 bg-transparent border-none p-0 focus:ring-0 w-full placeholder-gray-300"
                                         placeholder="テスト名を入力"
                                     />
-                                    <p className="text-xs text-gray-500">長押しで並べ替え / 編集可</p>
+                                    <p className="text-xs text-gray-500">カード右上のつまみ(⋮⋮)を長押しして移動</p>
                                 </div>
                             </div>
 
@@ -646,7 +689,7 @@
                                 return (
                                     <div 
                                         key={subject.id} 
-                                        className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all"
+                                        className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all relative"
                                         draggable="true"
                                         onDragStart={(e) => handleDragStart(e, 'subject', subject)}
                                         onDragEnd={handleDragEnd}
@@ -655,10 +698,7 @@
                                         onDrop={(e) => handleDrop(e, subject.id)}
                                     >
                                         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-start">
-                                            {/* HANDLE FOR DRAGGING SUBJECT */}
-                                            <div className="flex items-center gap-2 text-slate-400 mr-2 drag-handle">
-                                                <GripVertical size={20} />
-                                            </div>
+                                            {/* HANDLE FOR DRAGGING SUBJECT - MOVED TO TOP RIGHT FOR EASIER ACCESS */}
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2">
                                                     <h3 className="font-bold text-lg text-slate-800">{subject.name}</h3>
@@ -678,6 +718,11 @@
                                             </div>
                                             
                                             <div className="flex items-center gap-1">
+                                                 {/* DRAG HANDLE */}
+                                                <div className="text-slate-300 p-2 drag-handle cursor-grab active:cursor-grabbing hover:bg-slate-100 rounded mr-1">
+                                                    <GripVertical size={22} />
+                                                </div>
+
                                                 <button 
                                                     onClick={() => deleteSubject(subject.id)}
                                                     className="text-slate-300 hover:text-red-400 p-2"
@@ -713,7 +758,7 @@
                                                         onDrop={(e) => handleDrop(e, task.id, subject.id)}
                                                     >
                                                         {/* HANDLE FOR DRAGGING TASK */}
-                                                        <div className="flex items-center gap-2 text-slate-300 p-1 drag-handle">
+                                                        <div className="flex items-center gap-2 text-slate-300 p-2 drag-handle cursor-grab active:cursor-grabbing">
                                                             <GripVertical size={18} />
                                                         </div>
 
